@@ -1,0 +1,832 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+
+// --- STYLES ---
+const globalStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+  
+  body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+  .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .glass-panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+  }
+  
+  .procedural-badge {
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  }
+
+  .sidebar-link.active {
+      background: rgba(99, 102, 241, 0.1);
+      color: #818cf8;
+      border-right: 3px solid #6366f1;
+  }
+`;
+
+// --- ICONS ---
+const Icons = {
+    Brain: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
+    Zap: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+    Target: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+    Activity: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+    Clock: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+    CheckCircle: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+    XCircle: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
+    ChevronRight: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
+    BarChart: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
+    Home: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+    Infinity: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 1 0 0-8c-2 0-4 1.33-6 4Z"/></svg>,
+    Menu: ({size=24, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+};
+
+// --- CONSTANTS ---
+const TOPICS = [
+    "Ethics", "Quantitative Methods", "Economics", "Financial Statement Analysis", 
+    "Corporate Issuers", "Equity", "Fixed Income", "Derivatives", 
+    "Alternative Investments", "Portfolio Management"
+];
+
+// --- PROCEDURAL QUESTION GENERATOR ENGINE ---
+const QuestionFactory = {
+    randomInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+    randomFloat: (min, max, decimals = 2) => parseFloat((Math.random() * (max - min) + min).toFixed(decimals)),
+    
+    // Generator Templates
+    generators: [
+        {
+            topic: "Quantitative Methods",
+            generate: () => {
+                const pv = QuestionFactory.randomInt(1000, 10000);
+                const r = QuestionFactory.randomFloat(2, 12, 1);
+                const n = QuestionFactory.randomInt(3, 20);
+                const fv = (pv * Math.pow(1 + r/100, n)).toFixed(2);
+                
+                // Distractors
+                const d1 = (pv * (1 + (r/100) * n)).toFixed(2); // Simple interest error
+                const d2 = (pv * Math.pow(1 + r/100, n - 1)).toFixed(2); // N-1 error
+                const d3 = (pv * Math.pow(1 + (r+1)/100, n)).toFixed(2); // Rate error
+                
+                return {
+                    question: `An investor deposits $${pv.toLocaleString()} into an account paying ${r}% compounded annually. What is the value of the investment after ${n} years?`,
+                    options: [`$${Number(fv).toLocaleString()}`, `$${Number(d1).toLocaleString()}`, `$${Number(d2).toLocaleString()}`, `$${Number(d3).toLocaleString()}`],
+                    correctIndex: 0,
+                    explanation: `FV = PV * (1 + r)^n = ${pv} * (1.0${r < 10 ? '0'+r : r})^${n} = ${fv}. The calculation uses compound interest.`,
+                    formula: "FV = PV(1+r)^n",
+                    trap: "Simple Interest vs Compound"
+                };
+            }
+        },
+        {
+            topic: "Quantitative Methods",
+            generate: () => {
+                const returns = [QuestionFactory.randomInt(-5, 15), QuestionFactory.randomInt(-5, 15), QuestionFactory.randomInt(-5, 15), QuestionFactory.randomInt(-5, 15)];
+                const mean = returns.reduce((a,b) => a+b,0) / returns.length;
+                const variance = returns.reduce((a,b) => a + Math.pow(b - mean, 2), 0) / (returns.length - 1);
+                const stdDev = Math.sqrt(variance).toFixed(2);
+                
+                const d1 = Math.sqrt(returns.reduce((a,b) => a + Math.pow(b - mean, 2), 0) / returns.length).toFixed(2); // Population SD error
+                const d2 = (variance).toFixed(2); // Variance error
+                const d3 = (mean).toFixed(2); // Mean error
+                
+                return {
+                    question: `A sample of annual returns is: ${returns.join('%, ')}%. The sample standard deviation is closest to:`,
+                    options: [`${stdDev}%`, `${d1}%`, `${d2}%`, `${d3}%`],
+                    correctIndex: 0,
+                    explanation: `Sample Standard Deviation divides the sum of squared deviations by (n-1). Mean = ${mean}. Variance = Sum(x-mean)^2 / 3. SD = Sqrt(Variance).`,
+                    formula: "s = sqrt( Σ(x-x̄)² / (n-1) )",
+                    trap: "Population vs Sample SD"
+                };
+            }
+        },
+        {
+            topic: "Economics",
+            generate: () => {
+                const initialP = QuestionFactory.randomInt(10, 50);
+                const finalP = initialP + QuestionFactory.randomInt(2, 10);
+                const initialQ = QuestionFactory.randomInt(100, 200);
+                const elasticity = -1 * QuestionFactory.randomFloat(0.5, 2.5, 1);
+                // PED = %dQ / %dP -> %dQ = PED * %dP
+                const pctChangeP = (finalP - initialP) / initialP;
+                const pctChangeQ = elasticity * pctChangeP;
+                const finalQ = Math.round(initialQ * (1 + pctChangeQ));
+                
+                const d1 = Math.round(initialQ * (1 - pctChangeQ)); // Wrong direction
+                const d2 = Math.round(initialQ * (1 + pctChangeP)); // Price change only
+                const d3 = Math.round(initialQ + (elasticity * 10)); // Additive error
+                
+                return {
+                    question: `The price of a good increases from $${initialP} to $${finalP}. If the Price Elasticity of Demand is ${elasticity}, and initial quantity demanded was ${initialQ}, the new quantity demanded is closest to:`,
+                    options: [`${finalQ}`, `${d1}`, `${d2}`, `${d3}`],
+                    correctIndex: 0,
+                    explanation: `%ΔP = ${(pctChangeP*100).toFixed(1)}%. Given PED of ${elasticity}, %ΔQ = ${elasticity} * ${(pctChangeP*100).toFixed(1)}% = ${(pctChangeQ*100).toFixed(1)}%. New Q = ${initialQ} * (1 ${pctChangeQ >= 0 ? '+' : ''} ${(pctChangeQ).toFixed(3)}) ≈ ${finalQ}.`,
+                    formula: "PED = %ΔQ / %ΔP",
+                    trap: "Direction of Change"
+                };
+            }
+        },
+        {
+            topic: "Financial Statement Analysis",
+            generate: () => {
+                const currentAssets = QuestionFactory.randomInt(2000, 5000);
+                const inventory = QuestionFactory.randomInt(500, 1500);
+                const prepaid = QuestionFactory.randomInt(100, 300);
+                const currentLiabilities = QuestionFactory.randomInt(1000, 2500);
+                
+                const quickRatio = ((currentAssets - inventory - prepaid) / currentLiabilities).toFixed(2);
+                const currentRatio = (currentAssets / currentLiabilities).toFixed(2); // Distractor
+                const cashRatio = ((currentAssets - inventory - prepaid - 500) / currentLiabilities).toFixed(2); // Random Distractor
+                const inverted = (currentLiabilities / (currentAssets - inventory)).toFixed(2); // Inverted error
+
+                return {
+                    question: `A firm has Current Assets of $${currentAssets}, Inventory of $${inventory}, Prepaid Expenses of $${prepaid}, and Current Liabilities of $${currentLiabilities}. The Quick Ratio is closest to:`,
+                    options: [`${quickRatio}`, `${currentRatio}`, `${cashRatio}`, `${inverted}`],
+                    correctIndex: 0,
+                    explanation: `Quick Ratio = (Current Assets - Inventory - Prepaids) / Current Liabilities = (${currentAssets} - ${inventory} - ${prepaid}) / ${currentLiabilities} = ${quickRatio}.`,
+                    formula: "Quick Ratio = (CA - Inv) / CL",
+                    trap: "Current vs Quick Ratio"
+                };
+            }
+        },
+        {
+            topic: "Equity",
+            generate: () => {
+                const d0 = QuestionFactory.randomFloat(1, 5, 2);
+                const g = QuestionFactory.randomFloat(2, 6, 1);
+                const r = QuestionFactory.randomFloat(8, 15, 1);
+                
+                if (g >= r) return QuestionFactory.generators[0].generate(); // Fallback if math breaks
+
+                const d1 = d0 * (1 + g/100);
+                const value = (d1 / ((r - g)/100)).toFixed(2);
+                
+                const d_wrong = (d0 / ((r - g)/100)).toFixed(2); // Used D0 instead of D1
+                const d_flipped = (d1 / ((r + g)/100)).toFixed(2); // Added growth
+                const d_simple = (d1 * (100/r)).toFixed(2); // P/E sort of error
+
+                return {
+                    question: `A stock just paid a dividend of $${d0} (D0). Dividends are expected to grow at ${g}% indefinitely. The required rate of return is ${r}%. The intrinsic value is closest to:`,
+                    options: [`$${value}`, `$${d_wrong}`, `$${d_flipped}`, `$${d_simple}`],
+                    correctIndex: 0,
+                    explanation: `Gordon Growth Model: V0 = D1 / (r - g). First find D1 = D0 * (1+g) = $${d1.toFixed(2)}. Then V0 = ${d1.toFixed(2)} / (${r}% - ${g}%) = $${value}.`,
+                    formula: "V0 = D1 / (r - g)",
+                    trap: "Using D0 instead of D1"
+                };
+            }
+        },
+        {
+            topic: "Fixed Income",
+            generate: () => {
+                const par = 1000;
+                const couponRate = QuestionFactory.randomFloat(3, 8, 1);
+                const yieldRate = QuestionFactory.randomFloat(2, 10, 1);
+                // Simple scenario: Price vs Par
+                let status = "at par";
+                if (yieldRate > couponRate) status = "at a discount";
+                else if (yieldRate < couponRate) status = "at a premium";
+                
+                // Distractors
+                const d1 = status === "at a discount" ? "at a premium" : "at a discount";
+                const d2 = "at par";
+                const d3 = "with zero duration";
+
+                return {
+                    question: `A bond has a coupon rate of ${couponRate}% and a yield-to-maturity (YTM) of ${yieldRate}%. This bond is trading:`,
+                    options: [`${status}`, `${d1}`, `${d2}`, `${d3}`],
+                    correctIndex: 0,
+                    explanation: `When Coupon < YTM (${couponRate}% < ${yieldRate}%), the bond trades at a discount. When Coupon > YTM, it trades at a premium.`,
+                    formula: "Relationship: C vs YTM",
+                    trap: "Definition"
+                };
+            }
+        },
+        {
+            topic: "Corporate Issuers",
+            generate: () => {
+                const we = QuestionFactory.randomFloat(0.4, 0.7, 2); // Weight Equity
+                const wd = parseFloat((1 - we).toFixed(2)); // Weight Debt
+                const re = QuestionFactory.randomInt(8, 15); // Cost Equity
+                const rd = QuestionFactory.randomInt(4, 9); // Pre-tax Cost Debt
+                const t = QuestionFactory.randomInt(20, 30); // Tax Rate
+                
+                const wacc = (we * re + wd * rd * (1 - t/100)).toFixed(2);
+                
+                const d1 = (we * re + wd * rd).toFixed(2); // Forgot Tax Shield
+                const d2 = (we * re * (1-t/100) + wd * rd).toFixed(2); // Taxed Equity instead
+                const d3 = ((re + rd) / 2).toFixed(2); // Simple Average
+
+                return {
+                    question: `A company's capital structure is ${(we*100).toFixed(0)}% equity and ${(wd*100).toFixed(0)}% debt. Cost of equity is ${re}%, pre-tax cost of debt is ${rd}%, and tax rate is ${t}%. The WACC is closest to:`,
+                    options: [`${wacc}%`, `${d1}%`, `${d2}%`, `${d3}%`],
+                    correctIndex: 0,
+                    explanation: `WACC = (We * Re) + (Wd * Rd * (1 - t)). WACC = (${we} * ${re}) + (${wd} * ${rd} * (1 - ${t/100})) = ${wacc}%. Note: Debt cost is tax-adjusted.`,
+                    formula: "WACC = WeRe + WdRd(1-t)",
+                    trap: "Missing Tax Shield"
+                };
+            }
+        }
+    ],
+
+    // Generate a random question from templates or select a random topic
+    create: (topicFilter = null) => {
+        let pool = QuestionFactory.generators;
+        if (topicFilter && topicFilter !== 'Training' && topicFilter !== 'Mock') {
+            pool = pool.filter(g => g.topic === topicFilter);
+        }
+        if (pool.length === 0) pool = QuestionFactory.generators; // Fallback
+
+        const generator = pool[Math.floor(Math.random() * pool.length)];
+        const data = generator.generate();
+        
+        // Shuffle options
+        const indices = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+        const shuffledOptions = indices.map(i => data.options[i]);
+        const correctNewIndex = indices.indexOf(data.correctIndex);
+
+        return {
+            id: `GEN-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+            topic: generator.topic,
+            difficulty: 3,
+            question: data.question,
+            options: shuffledOptions,
+            correctAnswer: correctNewIndex,
+            explanation: data.explanation,
+            formulaUsed: data.formula,
+            trapType: data.trap,
+            isProcedural: true
+        };
+    }
+};
+
+// --- STATIC SEED DATA ---
+const SEED_QUESTIONS = [
+    { id: "ETH-001", topic: "Ethics", difficulty: 3, question: "According to the Standard on Independence and Objectivity, a member who is an investment manager for a pension fund should most likely:", options: ["Accept a paid travel offer from a broker to an educational conference.", "Accept a gift of modest value from a client for past performance.", "Reject all gifts from clients to avoid appearance of impropriety.", "Disclose all token gifts to their employer immediately."], correctAnswer: 1, explanation: "Standard I(B) allows accepting gifts from clients for past performance if disclosed to the employer. It distinguishes between gifts from clients (permissible with disclosure) and entities trying to influence future action (more strict).", trapType: "Nuance Trap" },
+    { id: "ETH-002", topic: "Ethics", difficulty: 4, question: "Jurevicius acts as a trustee for the Jones Trust. He also manages the personal account of Jones's son. A new IPO is suitable for both. The IPO is oversubscribed. Jurevicius should:", options: ["Allocate shares pro rata to all suitable accounts.", "Prioritize the Trust because of fiduciary duty.", "Prioritize the son's account as he is an individual.", "Forego the allocation to avoid conflict."], correctAnswer: 0, explanation: "Standard III(B) Fair Dealing requires fair treatment (not equal, but fair) for all clients. Pro rata allocation is the standard best practice for oversubscribed issues.", trapType: "Fiduciary Confusion" },
+    { id: "ETH-003", topic: "Ethics", difficulty: 2, question: "Mosaic Theory allows an analyst to use:", options: ["Material nonpublic information only.", "Nonmaterial nonpublic information and material public information.", "Material nonpublic and nonmaterial public information.", "Only public information."], correctAnswer: 1, explanation: "Mosaic theory allows combining material public info with nonmaterial nonpublic info. Using Material Nonpublic info is a violation.", trapType: "Definition" },
+    { id: "QNT-001", topic: "Quantitative Methods", difficulty: 3, question: "An investor's portfolio has a mean return of 12% and a standard deviation of 18%. If returns are normally distributed, the probability of a return less than -6% is closest to:", options: ["2.5%", "16%", "32%", "5%"], correctAnswer: 1, explanation: "Z = (X - µ) / σ = (-6 - 12) / 18 = -1.0. A Z-score of -1.0 corresponds to roughly 16% in the left tail.", formulaUsed: "Z = (X - Mean) / SD", trapType: "Calculation Error" },
+    { id: "QNT-002", topic: "Quantitative Methods", difficulty: 2, question: "Which scale of measurement allows for the calculation of ratios?", options: ["Nominal", "Ordinal", "Interval", "Ratio"], correctAnswer: 3, explanation: "Ratio scales have a true zero point, allowing for meaningful ratios ($20 is twice $10).", trapType: "Definition Recall" },
+    { id: "ECO-001", topic: "Economics", difficulty: 4, question: "In a fractional reserve banking system, if the reserve requirement is 10%, a $100 deposit can theoretically increase the money supply by:", options: ["$100", "$900", "$1,000", "$10,000"], correctAnswer: 2, explanation: "Money Multiplier = 1 / 0.10 = 10. Total Supply = $100 * 10 = $1,000.", formulaUsed: "Multiplier = 1 / RR", trapType: "Formula Trap" },
+    { id: "ECO-002", topic: "Economics", difficulty: 3, question: "A Giffen good is best described as a good where:", options: ["Substitution effect > Income effect.", "Negative Income effect > Substitution effect.", "Demand increases as income increases.", "Demand decreases as price decreases."], correctAnswer: 1, explanation: "For a Giffen good, the price increase makes the consumer so much poorer (negative income effect) that they buy more of the inferior good, outweighing the substitution effect.", trapType: "Conceptual Reversal" },
+    { id: "FSA-001", topic: "Financial Statement Analysis", difficulty: 4, question: "In a period of rising prices, which inventory method results in the highest Net Income?", options: ["LIFO", "FIFO", "Weighted Average", "Specific Identification"], correctAnswer: 1, explanation: "FIFO matches older (cheaper) costs against revenue, resulting in lower COGS and higher Net Income.", trapType: "Logic Grid" },
+    { id: "FSA-002", topic: "Financial Statement Analysis", difficulty: 3, question: "Under US GAAP, dividends paid are classified as:", options: ["Operating Cash Flow", "Investing Cash Flow", "Financing Cash Flow", "Operating or Financing"], correctAnswer: 2, explanation: "Under US GAAP, dividends paid are strictly Financing. Under IFRS, they can be Operating or Financing.", trapType: "US GAAP vs IFRS" },
+    { id: "CORP-001", topic: "Corporate Issuers", difficulty: 2, question: "The primary goal of a firm's management should be to maximize:", options: ["Net Income", "EPS", "Shareholder Wealth", "Revenue"], correctAnswer: 2, explanation: "Maximizing shareholder wealth accounts for risk and timing, unlike accounting metrics.", trapType: "Distractor" },
+    { id: "CORP-002", topic: "Corporate Issuers", difficulty: 3, question: "Which is an example of an ESG 'Social' factor?", options: ["Board composition", "Waste management", "Data privacy", "Executive comp"], correctAnswer: 2, explanation: "Data privacy affects customers/society. Board is Governance. Waste is Environmental.", trapType: "Category Mix-up" },
+    { id: "EQT-001", topic: "Equity", difficulty: 3, question: "An industry in the 'Shakeout' stage is characterized by:", options: ["Accelerating growth", "Slowing growth and intense competition", "Negative growth", "Stability"], correctAnswer: 1, explanation: "Shakeout involves slowing growth as demand saturates, leading to intense price competition.", trapType: "Stage Confusion" },
+    { id: "EQT-002", topic: "Equity", difficulty: 4, question: "Preferred stock pays $5. Required return is 8%. Value?", options: ["$40.00", "$62.50", "$6.25", "$50.00"], correctAnswer: 1, explanation: "Value = D / r = 5 / 0.08 = 62.5.", formulaUsed: "V = D / r", trapType: "Decimal Error" },
+    { id: "FIX-001", topic: "Fixed Income", difficulty: 4, question: "Bond Duration 7, Convexity 50. Yields rise 1%. Price change?", options: ["-7.00%", "-6.75%", "-7.25%", "+7.00%"], correctAnswer: 1, explanation: "%ΔPrice ≈ -Dur*Δy + 0.5*Conv*Δy^2 = -7(0.01) + 0.5(50)(0.0001) = -0.07 + 0.0025 = -6.75%.", formulaUsed: "Dur/Conv Approx", trapType: "Sign Error" },
+    { id: "FIX-002", topic: "Fixed Income", difficulty: 2, question: "Risk relevant for zero-coupon bond held to maturity?", options: ["Reinvestment risk", "Interest rate risk", "Inflation risk", "Liquidity risk"], correctAnswer: 2, explanation: "Held to maturity ignores price volatility. Zeros have no reinvestment risk. Inflation is the main threat.", trapType: "Scenario Assumption" },
+    { id: "DER-001", topic: "Derivatives", difficulty: 3, question: "Short position in a forward contract is obligated to:", options: ["Buy asset", "Sell asset", "Exercise option to sell", "Exercise option to buy"], correctAnswer: 1, explanation: "Short Forward = Obligation to Sell.", trapType: "Definition Recall" },
+    { id: "DER-002", topic: "Derivatives", difficulty: 4, question: "Call option is deep 'in the money' when:", options: ["Strike > Spot", "Spot > Strike", "Spot = Strike", "Premium is zero"], correctAnswer: 1, explanation: "Call ITM when you can buy lower than market (Strike < Spot).", trapType: "Terminology" },
+    { id: "ALT-001", topic: "Alternative Investments", difficulty: 3, question: "Characteristic of most hedge funds:", options: ["High liquidity", "Low minimums", "LP Structure", "Strict regulation"], correctAnswer: 2, explanation: "Hedge funds are typically Limited Partnerships (LPs) with lock-ups (low liquidity).", trapType: "Characteristic Mix-up" },
+    { id: "ALT-002", topic: "Alternative Investments", difficulty: 2, question: "'Contango' means:", options: ["Spot > Futures", "Futures > Spot", "Supply > Demand", "Positive roll yield"], correctAnswer: 1, explanation: "Contango: Futures > Spot. Backwardation: Spot > Futures.", trapType: "Definition" },
+    { id: "PM-001", topic: "Portfolio Management", difficulty: 3, question: "CAPM expected return of stock with Beta 0:", options: ["Zero", "Market Return", "Risk-Free Rate", "Inflation"], correctAnswer: 2, explanation: "If Beta = 0, E(R) = Rf + 0 = Rf.", formulaUsed: "CAPM", trapType: "Conceptual" },
+    { id: "PM-002", topic: "Portfolio Management", difficulty: 4, question: "Key metric for diversification benefit:", options: ["Standard deviation", "Variance", "Beta", "Correlation/Covariance"], correctAnswer: 3, explanation: "Correlation/Covariance determines how assets move together, driving diversification.", trapType: "Risk Metric" }
+];
+
+// --- HELPER FUNCTIONS ---
+const calculateSRS = (currentInterval, grade) => {
+    let nextInterval;
+    if (grade === 0) nextInterval = 1;
+    else if (grade === 1) nextInterval = 1;
+    else if (grade === 2) nextInterval = currentInterval === 0 ? 3 : Math.ceil(currentInterval * 2.0);
+    else nextInterval = currentInterval === 0 ? 7 : Math.ceil(currentInterval * 3.5);
+    return { nextInterval, nextReview: Date.now() + (nextInterval * 86400000) };
+};
+
+const getMasteryColor = (score) => {
+    if (score >= 80) return "text-emerald-400";
+    if (score >= 60) return "text-yellow-400";
+    return "text-rose-400";
+};
+
+const getMasteryBg = (score) => {
+    if (score >= 80) return "bg-emerald-500";
+    if (score >= 60) return "bg-yellow-500";
+    return "bg-rose-500";
+};
+
+// --- LAYOUT COMPONENTS ---
+
+const Sidebar = ({ currentView, onViewChange, isOpen, setIsOpen }) => {
+    const navItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: Icons.Home },
+        { id: 'training', label: 'Training Mode', icon: Icons.Zap },
+        { id: 'weakness', label: 'Weakness Mode', icon: Icons.Target },
+        { id: 'mock', label: 'Mock Exam', icon: Icons.Clock },
+    ];
+
+    return (
+        <>
+            {/* Mobile Overlay */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-40 md:hidden"
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
+
+            {/* Sidebar Container */}
+            <div className={`
+                fixed top-0 left-0 bottom-0 w-64 bg-slate-900 border-r border-slate-800 z-50 transform transition-transform duration-300 ease-in-out
+                ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
+            `}>
+                <div className="p-6 border-b border-slate-800">
+                    <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                        <span className="text-indigo-500 text-2xl">CFA</span>
+                        <span className="font-light">Machine</span>
+                    </h1>
+                    <div className="mt-2 text-xs text-slate-500 uppercase tracking-widest font-mono">Level 1 Simulator</div>
+                </div>
+
+                <nav className="p-4 space-y-1">
+                    {navItems.map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => {
+                                onViewChange(item.id);
+                                setIsOpen(false);
+                            }}
+                            className={`
+                                w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors
+                                ${currentView === item.id 
+                                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
+                                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'}
+                            `}
+                        >
+                            <item.icon size={18} />
+                            {item.label}
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800 bg-slate-900/50">
+                    <div className="flex items-center gap-3 px-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                            JS
+                        </div>
+                        <div>
+                            <div className="text-sm font-medium text-white">Candidate</div>
+                            <div className="text-xs text-emerald-500 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Online
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+};
+
+// --- FEATURE COMPONENTS ---
+
+const Dashboard = ({ userStats }) => {
+    const overallAccuracy = useMemo(() => {
+        const totalCorrect = Object.values(userStats).reduce((acc, curr) => acc + (curr.timesCorrect || 0), 0);
+        const totalAttempts = Object.values(userStats).reduce((acc, curr) => acc + (curr.timesCorrect || 0) + (curr.timesWrong || 0), 0);
+        return totalAttempts === 0 ? 0 : Math.round((totalCorrect / totalAttempts) * 100);
+    }, [userStats]);
+
+    const topicMastery = useMemo(() => {
+        const map = {};
+        TOPICS.forEach(t => map[t] = { total: 0, masterySum: 0 });
+        Object.values(userStats).forEach(stat => {
+            if (map[stat.topic]) {
+                map[stat.topic].total += 1;
+                map[stat.topic].masterySum += stat.masteryScore;
+            }
+        });
+        return map;
+    }, [userStats]);
+
+    return (
+        <div className="max-w-6xl mx-auto space-y-6">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-white">Performance Overview</h2>
+                    <p className="text-slate-400 text-sm">Track your retrieval practice and readiness.</p>
+                </div>
+                <div className="flex items-center gap-2 text-indigo-300 bg-indigo-950/50 px-3 py-1.5 rounded-full border border-indigo-500/20">
+                    <Icons.Infinity size={16} />
+                    <span className="text-xs font-bold uppercase tracking-wider">Procedural Engine Active</span>
+                </div>
+            </header>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-card p-6 rounded-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Icons.Activity size={64} />
+                    </div>
+                    <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Total Mastery</div>
+                    <div className="text-4xl font-bold text-white mb-1">{overallAccuracy}%</div>
+                    <div className="text-sm text-slate-500">Weighted across all topics</div>
+                </div>
+
+                <div className="glass-card p-6 rounded-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Icons.Brain size={64} />
+                    </div>
+                    <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Due for Review</div>
+                    <div className="text-4xl font-bold text-emerald-400 mb-1">
+                        {Object.values(userStats).filter(s => s.nextReview < Date.now()).length}
+                    </div>
+                    <div className="text-sm text-slate-500">Scheduled by SRS algorithm</div>
+                </div>
+
+                <div className="glass-card p-6 rounded-xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Icons.Target size={64} />
+                    </div>
+                    <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Critical Weakness</div>
+                    <div className="text-4xl font-bold text-rose-400 mb-1">
+                        {Object.values(userStats).filter(s => s.masteryScore < 60).length}
+                    </div>
+                    <div className="text-sm text-slate-500">Topics below 60% mastery</div>
+                </div>
+            </div>
+
+            {/* Topic Grid */}
+            <div className="glass-card rounded-xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="font-bold text-white flex items-center gap-2">
+                        <Icons.BarChart size={20} className="text-indigo-400" /> Topic Breakdown
+                    </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    {TOPICS.map(topic => {
+                        const data = topicMastery[topic] || { total: 0, masterySum: 0 };
+                        const avgMastery = data.total === 0 ? 0 : Math.round(data.masterySum / data.total);
+                        return (
+                            <div key={topic} className="group">
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <span className="text-sm text-slate-300 group-hover:text-white transition-colors">{topic}</span>
+                                    <span className={`text-xs font-mono font-bold ${getMasteryColor(avgMastery)}`}>
+                                        {avgMastery}%
+                                    </span>
+                                </div>
+                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full rounded-full ${getMasteryBg(avgMastery)} transition-all duration-1000`} 
+                                        style={{ width: `${avgMastery}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const QuizEngine = ({ questions, mode, updateProgress }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [selectedOption, setSelectedOption] = useState(null);
+    const [showExplanation, setShowExplanation] = useState(false);
+    const [sessionStats, setSessionStats] = useState({ correct: 0, total: 0 });
+    const [isFinished, setIsFinished] = useState(false);
+    const [qList, setQList] = useState(questions);
+
+    useEffect(() => {
+        if (mode === 'training' && currentIndex >= qList.length - 2) {
+            setQList(prev => [...prev, QuestionFactory.create()]);
+        }
+    }, [currentIndex, mode, qList.length]);
+
+    const currentQ = qList[currentIndex];
+
+    const handleAnswer = (optionIndex) => {
+        if (showExplanation) return;
+        setSelectedOption(optionIndex);
+        setShowExplanation(true);
+    };
+
+    const handleRate = (grade) => {
+        const isCorrect = selectedOption === currentQ.correctAnswer;
+        updateProgress(currentQ.id, currentQ.topic, isCorrect, grade);
+
+        setSessionStats(prev => ({ correct: prev.correct + (isCorrect ? 1 : 0), total: prev.total + 1 }));
+
+        if (mode === 'mock' && currentIndex >= 179) setIsFinished(true);
+        else if (mode !== 'training' && currentIndex >= qList.length - 1) setIsFinished(true);
+        else {
+            setTimeout(() => {
+                setSelectedOption(null);
+                setShowExplanation(false);
+                setCurrentIndex(curr => curr + 1);
+            }, 100);
+        }
+    };
+
+    if (!currentQ || isFinished) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                <div className="glass-card p-12 rounded-2xl max-w-md w-full border-t-4 border-emerald-500">
+                    <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Icons.CheckCircle size={40} className="text-emerald-500" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-white mb-2">Session Complete</h2>
+                    <p className="text-slate-400 mb-8">Queue cleared. Your SRS data has been updated.</p>
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="bg-slate-800/50 p-4 rounded-xl">
+                            <div className="text-2xl font-mono text-white font-bold">{sessionStats.correct}</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-wider">Correct</div>
+                        </div>
+                        <div className="bg-slate-800/50 p-4 rounded-xl">
+                            <div className="text-2xl font-mono text-white font-bold">{Math.round((sessionStats.correct/sessionStats.total)*100) || 0}%</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-wider">Accuracy</div>
+                        </div>
+                    </div>
+                    <button onClick={() => window.location.reload()} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-colors">
+                        Return to Dashboard
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-4xl mx-auto h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 font-mono text-xs font-bold border border-slate-700">
+                        {currentIndex + 1}
+                    </span>
+                    <div className="flex flex-col">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{mode} Mode</span>
+                        <span className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                            {currentQ.topic}
+                            {currentQ.isProcedural && <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-400 border border-indigo-500/20">Generated</span>}
+                        </span>
+                    </div>
+                </div>
+                <div className="text-xs font-mono text-slate-600">ID: {currentQ.id}</div>
+            </div>
+
+            {/* Question Card */}
+            <div className="glass-card rounded-xl p-8 mb-6 flex-1 flex flex-col">
+                <h2 className="text-xl md:text-2xl font-medium text-white mb-8 leading-relaxed">
+                    {currentQ.question}
+                </h2>
+
+                <div className="space-y-3">
+                    {currentQ.options.map((opt, idx) => {
+                        let btnClass = "w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group ";
+                        if (!showExplanation) {
+                            btnClass += selectedOption === idx 
+                                ? "border-indigo-500 bg-indigo-500/10 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]" 
+                                : "border-slate-700/50 hover:border-slate-500 hover:bg-slate-800/50 text-slate-300";
+                        } else {
+                            if (idx === currentQ.correctAnswer) btnClass += "border-emerald-500 bg-emerald-500/10 text-emerald-100";
+                            else if (idx === selectedOption) btnClass += "border-rose-500 bg-rose-500/10 text-rose-100 opacity-60";
+                            else btnClass += "border-slate-800 text-slate-600 opacity-40";
+                        }
+                        return (
+                            <button key={idx} onClick={() => handleAnswer(idx)} disabled={showExplanation} className={btnClass}>
+                                <span className={`font-mono pt-0.5 text-sm ${selectedOption === idx ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`}>{['A','B','C','D'][idx]}</span>
+                                <span>{opt}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Action Bar */}
+            {showExplanation && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="glass-card p-6 rounded-xl border-l-4 border-emerald-500 mb-6 bg-slate-900/80">
+                        <h3 className="text-emerald-400 font-bold mb-2 flex items-center gap-2 text-sm uppercase tracking-wider">
+                            <Icons.CheckCircle size={16} /> Explanation
+                        </h3>
+                        <p className="text-slate-300 leading-relaxed mb-4">{currentQ.explanation}</p>
+                        {currentQ.formulaUsed && (
+                            <div className="inline-block bg-slate-950 px-3 py-1.5 rounded border border-slate-800 font-mono text-xs text-yellow-500">
+                                𝑓: {currentQ.formulaUsed}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                        {[
+                            { label: 'Again', sub: '< 1m', color: 'rose', val: 0 },
+                            { label: 'Hard', sub: '1d', color: 'orange', val: 1 },
+                            { label: 'Good', sub: '3d', color: 'yellow', val: 2 },
+                            { label: 'Easy', sub: '7d', color: 'emerald', val: 3 }
+                        ].map((btn) => (
+                            <button 
+                                key={btn.label}
+                                onClick={() => handleRate(btn.val)} 
+                                className={`
+                                    flex flex-col items-center justify-center py-3 rounded-lg border transition-all hover:-translate-y-0.5
+                                    bg-${btn.color}-500/10 border-${btn.color}-500/30 hover:bg-${btn.color}-500/20 text-${btn.color}-200
+                                `}
+                            >
+                                <span className="text-sm font-bold">{btn.label}</span>
+                                <span className="text-[10px] opacity-60 font-mono">{btn.sub}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const MockExam = ({ questions, onExit }) => {
+    const mockQuestions = useMemo(() => {
+        const full = [...questions];
+        while(full.length < 180) full.push(QuestionFactory.create());
+        return full.slice(0, 180);
+    }, [questions]);
+
+    const [answers, setAnswers] = useState({});
+    const [timeLeft, setTimeLeft] = useState(180 * 60); 
+    const [submitted, setSubmitted] = useState(false);
+
+    useEffect(() => {
+        if (submitted) return;
+        const timer = setInterval(() => setTimeLeft(p => p <= 1 ? (clearInterval(timer), handleSubmit(), 0) : p - 1), 1000);
+        return () => clearInterval(timer);
+    }, [submitted]);
+
+    const formatTime = (s) => {
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+        return `${h}:${m < 10 ? '0'+m : m}:${sec < 10 ? '0'+sec : sec}`;
+    };
+
+    const handleSubmit = () => { setSubmitted(true); window.scrollTo(0, 0); };
+    const handleSelect = (qId, idx) => { if (!submitted) setAnswers(p => ({ ...p, [qId]: idx })); };
+    const calculateScore = () => Math.round((mockQuestions.filter(q => answers[q.id] === q.correctAnswer).length / mockQuestions.length) * 100);
+
+    return (
+        <div className="max-w-4xl mx-auto">
+            <div className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 py-4 mb-8 flex justify-between items-center">
+                <div>
+                    <h2 className="text-white font-bold text-lg">Mock Session</h2>
+                    <div className="text-xs text-slate-400">180 Questions • Procedural</div>
+                </div>
+                {!submitted ? (
+                    <div className="flex items-center gap-4">
+                        <div className="font-mono text-xl text-indigo-400 font-bold tabular-nums bg-slate-800 px-3 py-1 rounded">{formatTime(timeLeft)}</div>
+                        <button onClick={handleSubmit} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-2 rounded-lg text-white font-bold text-sm transition-colors">Submit Exam</button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-4">
+                        <div className="text-2xl font-bold text-emerald-400">{calculateScore()}%</div>
+                        <button onClick={onExit} className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-white text-sm">Exit Review</button>
+                    </div>
+                )}
+            </div>
+
+            {submitted && (
+                <div className="glass-card p-8 rounded-xl mb-8 border-t-4 border-indigo-500">
+                    <h3 className="text-2xl font-bold text-white mb-2">Results</h3>
+                    <p className="text-slate-400 mb-6">{calculateScore() >= 70 ? "Passing Score! Excellent work." : "Keep practicing. Review errors below."}</p>
+                    <div className="h-4 bg-slate-800 rounded-full overflow-hidden">
+                        <div className={`h-full ${calculateScore() >= 70 ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${calculateScore()}%` }}></div>
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-8">
+                {mockQuestions.map((q, idx) => {
+                    const isCorrect = answers[q.id] === q.correctAnswer, userAnswer = answers[q.id];
+                    return (
+                        <div key={q.id} className={`p-6 rounded-xl border ${submitted ? (isCorrect ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-rose-500/20 bg-rose-500/5') : 'border-slate-800 bg-slate-800/20'}`}>
+                            <div className="flex gap-4">
+                                <div className="text-slate-500 font-mono text-sm pt-1">#{idx + 1}</div>
+                                <div className="flex-1">
+                                    <p className="text-lg text-slate-200 mb-4">{q.question}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                                        {q.options.map((opt, optIdx) => {
+                                            let style = "p-3 rounded-lg border text-sm text-left transition-colors ";
+                                            if (!submitted) {
+                                                style += userAnswer === optIdx ? "border-indigo-500 bg-indigo-500/20 text-indigo-200" : "border-slate-700 text-slate-400 hover:bg-slate-700/50";
+                                            } else {
+                                                if (optIdx === q.correctAnswer) style += "border-emerald-500 bg-emerald-500/20 text-emerald-200 font-bold";
+                                                else if (userAnswer === optIdx) style += "border-rose-500 bg-rose-500/20 text-rose-200 line-through";
+                                                else style += "border-slate-800 text-slate-600 opacity-50";
+                                            }
+                                            return <button key={optIdx} onClick={() => handleSelect(q.id, optIdx)} className={style} disabled={submitted}>{['A','B','C','D'][optIdx]}. {opt}</button>;
+                                        })}
+                                    </div>
+                                    {submitted && !isCorrect && <div className="p-4 bg-slate-900/50 rounded-lg text-sm text-slate-300 border border-slate-700"><span className="text-emerald-400 font-bold block mb-1">Explanation:</span>{q.explanation}</div>}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// 4. MAIN APP LAYOUT
+const App = () => {
+    const [view, setView] = useState('dashboard');
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [userStats, setUserStats] = useState({});
+
+    useEffect(() => {
+        const saved = localStorage.getItem('cfa_app_data_v2');
+        if (saved) setUserStats(JSON.parse(saved));
+        else {
+            const initStats = {};
+            SEED_QUESTIONS.forEach(q => initStats[q.id] = { id: q.id, topic: q.topic, masteryScore: 0, timesCorrect: 0, timesWrong: 0, lastSeen: 0, interval: 0, nextReview: 0 });
+            setUserStats(initStats);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (Object.keys(userStats).length > 0) localStorage.setItem('cfa_app_data_v2', JSON.stringify(userStats));
+    }, [userStats]);
+
+    const updateProgress = (qId, topic, isCorrect, grade) => {
+        const trackingId = qId.startsWith('GEN') ? `TOPIC-${topic}` : qId;
+        setUserStats(prev => {
+            const currentStat = prev[trackingId] || { id: trackingId, topic, masteryScore: 0, timesCorrect: 0, timesWrong: 0, lastSeen: 0, interval: 0 };
+            const { nextInterval, nextReview } = calculateSRS(currentStat.interval || 0, grade);
+            let newMastery = currentStat.masteryScore;
+            if (isCorrect) newMastery = Math.min(100, newMastery + 5);
+            else newMastery = Math.max(0, newMastery - 15);
+            return { ...prev, [trackingId]: { ...currentStat, lastSeen: Date.now(), timesCorrect: currentStat.timesCorrect + (isCorrect ? 1 : 0), timesWrong: currentStat.timesWrong + (isCorrect ? 0 : 1), masteryScore: newMastery, interval: nextInterval, nextReview: nextReview } };
+        });
+    };
+
+    const getFilteredQuestions = (mode) => {
+        const now = Date.now();
+        let filtered = [];
+        if (mode === 'training') {
+            filtered = SEED_QUESTIONS.filter(q => {
+                const stat = userStats[q.id];
+                if (!stat) return true;
+                return stat.nextReview <= now;
+            });
+            if (filtered.length < 10) while(filtered.length < 10) filtered.push(QuestionFactory.create());
+        } else if (mode === 'weakness') {
+            filtered = SEED_QUESTIONS.filter(q => (userStats[q.id]?.masteryScore || 0) < 60);
+            if (filtered.length < 10) while(filtered.length < 10) filtered.push(QuestionFactory.create());
+        } else if (mode === 'mock') {
+            filtered = [...SEED_QUESTIONS];
+        }
+        return filtered;
+    };
+
+    return (
+        <>
+            <style>{globalStyles}</style>
+            <div className="flex h-screen overflow-hidden bg-slate-900 text-slate-100">
+                <Sidebar 
+                    currentView={view} 
+                    onViewChange={setView} 
+                    isOpen={sidebarOpen}
+                    setIsOpen={setSidebarOpen}
+                />
+                
+                <div className="flex-1 flex flex-col h-screen overflow-hidden md:ml-64 relative">
+                    {/* Mobile Header */}
+                    <header className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900 z-20">
+                        <span className="font-bold text-lg">CFA Machine</span>
+                        <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-400">
+                            <Icons.Menu />
+                        </button>
+                    </header>
+
+                    {/* Main Content Area */}
+                    <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+                        {view === 'dashboard' && <Dashboard userStats={userStats} />}
+                        {(view === 'training' || view === 'weakness') && (
+                            <QuizEngine 
+                                questions={getFilteredQuestions(view)} 
+                                mode={view} 
+                                updateProgress={updateProgress} 
+                            />
+                        )}
+                        {view === 'mock' && (
+                            <MockExam 
+                                questions={getFilteredQuestions('mock')} 
+                                onExit={() => setView('dashboard')} 
+                            />
+                        )}
+                    </main>
+                </div>
+            </div>
+        </>
+    );
+};
+
+export default App;
